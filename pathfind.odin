@@ -1,4 +1,4 @@
-package nav
+package navmesh
 
 // Runtime pathfinding: A*, funnel algorithm, mesh queries.
 

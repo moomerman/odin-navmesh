@@ -1,5 +1,5 @@
 #+build !js
-package nav
+package navmesh
 
 import "core:testing"
 

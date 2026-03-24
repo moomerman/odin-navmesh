@@ -1,4 +1,4 @@
-package nav
+package navmesh
 
 // 2D Navigation Mesh for Point-and-Click Adventure Games
 //

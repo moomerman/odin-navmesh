@@ -1,4 +1,4 @@
-package nav
+package navmesh
 
 // Odin bindings for libtess2 (Mikko Mononen's polygon tessellation library).
 // Based on bindings from github.com/varomix/ohcad.
