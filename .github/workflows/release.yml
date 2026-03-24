@@ -19,7 +19,7 @@ jobs:
             cc: cc
             flags: "-c -O2 -arch arm64"
             ar: "ar rcs libtess2.a *.o"
-          - os: macos-13
+          - os: macos-latest
             target: macos-x86_64
             artifact: libtess2.a
             cc: cc
