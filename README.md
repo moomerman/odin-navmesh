@@ -4,6 +4,8 @@
 
 Pre-built libraries are included for macOS (arm64/amd64), Linux (amd64), Windows (amd64), and WASM.
 
+<img width="1310" height="778" alt="image" src="https://github.com/user-attachments/assets/8b807074-a9b0-4823-ba19-574045aecfef" />
+
 ## Usage
 
 ```odin
