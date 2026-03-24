@@ -9,6 +9,7 @@ on:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -27,28 +28,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Odin (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          OS_TAG=""
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            OS_TAG="macos-arm64"
-          else
-            OS_TAG="ubuntu-amd64"
-          fi
-          curl -fsSL "https://github.com/odin-lang/Odin/releases/latest/download/odin-${OS_TAG}-nightly+date.tar.gz" -o odin.tar.gz
-          mkdir -p odin-install
-          tar xzf odin.tar.gz -C odin-install --strip-components=1
-          echo "$PWD/odin-install" >> $GITHUB_PATH
-
-      - name: Install Odin (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          Invoke-WebRequest -Uri "https://github.com/odin-lang/Odin/releases/latest/download/odin-windows-amd64-nightly+date.zip" -OutFile odin.zip
-          Expand-Archive odin.zip -DestinationPath odin-install
-          $dir = (Get-ChildItem odin-install -Directory | Select-Object -First 1).FullName
-          echo "$dir" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: nightly
 
       - name: Build libtess2 (Unix)
         if: runner.os != 'Windows'
