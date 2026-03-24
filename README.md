@@ -26,27 +26,27 @@ defer delete(path)
 
 ## API
 
-```
+```odin
 bake(outer: []Vec2, holes: [][]Vec2) -> (Nav_Mesh, Bake_Error)
 ```
 Tessellate a walkable polygon with optional holes into a navigation mesh. `outer` must be counter-clockwise, holes must be clockwise.
 
-```
+```odin
 destroy(mesh: ^Nav_Mesh)
 ```
 Free the mesh.
 
-```
+```odin
 find_path(mesh: ^Nav_Mesh, start, goal: Vec2) -> []Vec2
 ```
 Find a smoothed path between two points. If `goal` is outside the mesh it snaps to the nearest boundary point. Returns `nil` if no path exists. Caller must `delete` the result.
 
-```
+```odin
 point_in_mesh(mesh: ^Nav_Mesh, p: Vec2) -> bool
 ```
 Test if a point is inside the walkable area.
 
-```
+```odin
 nearest_point_on_mesh_boundary(mesh: ^Nav_Mesh, p: Vec2) -> Vec2
 ```
 Project a point onto the nearest mesh boundary edge.
