@@ -56,6 +56,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd /d %GITHUB_WORKSPACE%\libtess2-src
           cl /c /O2 /I Include Source\bucketalloc.c Source\dict.c Source\geom.c Source\mesh.c Source\priorityq.c Source\sweep.c Source\tess.c
           lib /OUT:libtess2.lib *.obj
 
@@ -70,18 +71,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install LLVM
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y llvm lld
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y llvm lld
 
-      - name: Install Odin
-        run: |
-          curl -fsSL https://github.com/odin-lang/Odin/releases/latest/download/odin-ubuntu-amd64-nightly+date.tar.gz -o odin.tar.gz || \
-          curl -fsSL https://github.com/odin-lang/Odin/releases/download/dev-2024-12/odin-ubuntu-amd64-dev-2024-12.tar.gz -o odin.tar.gz
-          mkdir -p odin-install
-          tar xzf odin.tar.gz -C odin-install --strip-components=1
-          echo "$PWD/odin-install" >> $GITHUB_PATH
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: nightly
 
       - name: Clone libtess2
         run: git clone --depth 1 https://github.com/memononen/libtess2.git /tmp/libtess2
