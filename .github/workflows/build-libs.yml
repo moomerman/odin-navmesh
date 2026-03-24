@@ -1,0 +1,125 @@
+name: Build libs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: darwin_arm64
+            artifact: libtess2.a
+            lib_name: libtess2_darwin_arm64.a
+            cc_flags: "-c -O2 -arch arm64"
+          - os: macos-latest
+            target: darwin_amd64
+            artifact: libtess2.a
+            lib_name: libtess2_darwin_amd64.a
+            cc_flags: "-c -O2 -arch x86_64"
+          - os: ubuntu-latest
+            target: linux_amd64
+            artifact: libtess2.a
+            lib_name: libtess2_linux_amd64.a
+            cc_flags: "-c -O2 -fPIC"
+          - os: windows-latest
+            target: windows_amd64
+            artifact: libtess2.lib
+            lib_name: libtess2_windows_amd64.lib
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Clone libtess2
+        run: git clone --depth 1 https://github.com/memononen/libtess2.git libtess2-src
+
+      - name: Build (Unix)
+        if: runner.os != 'Windows'
+        working-directory: libtess2-src
+        run: |
+          cc ${{ matrix.cc_flags }} -I Include Source/*.c
+          ar rcs libtess2.a *.o
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        working-directory: libtess2-src
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd /d %GITHUB_WORKSPACE%\libtess2-src
+          cl /c /O2 /I Include Source\bucketalloc.c Source\dict.c Source\geom.c Source\mesh.c Source\priorityq.c Source\sweep.c Source\tess.c
+          lib /OUT:libtess2.lib *.obj
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.lib_name }}
+          path: libtess2-src/${{ matrix.artifact }}
+
+  build-wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y llvm lld
+
+      - uses: laytan/setup-odin@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          release: nightly
+
+      - name: Clone libtess2
+        run: git clone --depth 1 https://github.com/memononen/libtess2.git /tmp/libtess2
+
+      - name: Build WASM object
+        run: |
+          ODIN_ROOT=$(odin root)
+          cd /tmp/libtess2
+          clang -c -Os --target=wasm32 \
+            --sysroot=$ODIN_ROOT/vendor/libc-shim \
+            -isystem $GITHUB_WORKSPACE/lib/wasm_shim \
+            -I Include \
+            Source/*.c \
+            $GITHUB_WORKSPACE/lib/wasm_shim/setjmp.c
+          wasm-ld -r *.o -o libtess2_wasm.o
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libtess2_wasm.o
+          path: /tmp/libtess2/libtess2_wasm.o
+
+  commit-libs:
+    needs: [build-native, build-wasm]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Copy libs into repo
+        run: |
+          cp artifacts/libtess2_darwin_arm64.a/libtess2.a    lib/libtess2_darwin_arm64.a
+          cp artifacts/libtess2_darwin_amd64.a/libtess2.a    lib/libtess2_darwin_amd64.a
+          cp artifacts/libtess2_linux_amd64.a/libtess2.a     lib/libtess2_linux_amd64.a
+          cp artifacts/libtess2_windows_amd64.lib/libtess2.lib lib/libtess2_windows_amd64.lib
+          cp artifacts/libtess2_wasm.o/libtess2_wasm.o       lib/libtess2_wasm.o
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add lib/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update pre-built libtess2 libraries"
+            git push
+          fi

@@ -11,18 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: macos-latest
-            target: macos-arm64
-            cc_flags: "-c -O2 -arch arm64"
-            lib_name: libtess2_darwin_arm64.a
-          - os: ubuntu-latest
-            target: linux-x86_64
-            cc_flags: "-c -O2 -fPIC"
-            lib_name: libtess2_linux_amd64.a
-          - os: windows-latest
-            target: windows-x86_64
-            lib_name: libtess2_windows_amd64.lib
+        os: [macos-latest, ubuntu-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -32,26 +21,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           release: nightly
-
-      - name: Build libtess2 (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          git clone --depth 1 https://github.com/memononen/libtess2.git /tmp/libtess2
-          cd /tmp/libtess2
-          cc ${{ matrix.cc_flags }} -I Include Source/*.c
-          ar rcs libtess2.a *.o
-          cp libtess2.a $GITHUB_WORKSPACE/lib/${{ matrix.lib_name }}
-
-      - name: Build libtess2 (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          git clone --depth 1 https://github.com/memononen/libtess2.git %TEMP%\libtess2
-          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          cd /d %TEMP%\libtess2
-          cl /c /O2 /I Include Source\bucketalloc.c Source\dict.c Source\geom.c Source\mesh.c Source\priorityq.c Source\sweep.c Source\tess.c
-          lib /OUT:libtess2.lib *.obj
-          copy libtess2.lib %GITHUB_WORKSPACE%\lib\${{ matrix.lib_name }}
 
       - name: Run tests
         run: odin test . -vet -strict-style -vet-semicolon -vet-cast -vet-using-param -vet-shadowing -warnings-as-errors
