@@ -19,7 +19,7 @@ package navmesh
 import "core:c"
 import "core:math"
 
-import tess2 "../libtess2/odin"
+import tess2 ".deps/github.com/moomerman/libtess2/odin"
 
 Vec2 :: [2]f32
 Triangle :: [3]i32
