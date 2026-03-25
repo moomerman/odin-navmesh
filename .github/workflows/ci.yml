@@ -22,5 +22,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           release: nightly
 
-      - name: Run tests
+      - name: Test libtess2 (Odin)
+        run: odin test libtess2/odin/ -vet -strict-style -vet-semicolon -vet-cast -vet-using-param -vet-shadowing -warnings-as-errors
+
+      - name: Test libtess2 (C)
+        if: runner.os != 'Windows'
+        run: sh libtess2/c/run.sh
+
+      - name: Test navmesh
         run: odin test . -vet -strict-style -vet-semicolon -vet-cast -vet-using-param -vet-shadowing -warnings-as-errors

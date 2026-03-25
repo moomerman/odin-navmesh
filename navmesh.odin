@@ -19,6 +19,8 @@ package navmesh
 import "core:c"
 import "core:math"
 
+import tess2 "../libtess2/odin"
+
 Vec2 :: [2]f32
 Triangle :: [3]i32
 
@@ -51,32 +53,32 @@ bake :: proc(
 		return
 	}
 
-	tess := NewTess(nil)
+	tess := tess2.NewTess(nil)
 	if tess == nil {
 		err = .Tessellation_Failed
 		return
 	}
-	defer DeleteTess(tess)
+	defer tess2.DeleteTess(tess)
 
 	// Enable constrained Delaunay for better triangle quality.
-	SetOption(tess, c.int(Tess_Option.Constrained_Delaunay_Triangulation), 1)
+	tess2.SetOption(tess, c.int(tess2.Option.Constrained_Delaunay_Triangulation), 1)
 
 	// Add the outer boundary contour.
-	AddContour(tess, 2, raw_data(outer), size_of(Vec2), c.int(len(outer)))
+	tess2.AddContour(tess, 2, raw_data(outer), size_of(Vec2), c.int(len(outer)))
 
 	// Add each hole as a separate contour.
 	for hole in holes {
 		if len(hole) >= 3 {
-			AddContour(tess, 2, raw_data(hole), size_of(Vec2), c.int(len(hole)))
+			tess2.AddContour(tess, 2, raw_data(hole), size_of(Vec2), c.int(len(hole)))
 		}
 	}
 
 	// Tessellate with CONNECTED_POLYGONS to get adjacency info.
 	normal := [3]f32{0, 0, 1}
-	result := Tesselate(
+	result := tess2.Tesselate(
 		tess,
-		c.int(Tess_Winding_Rule.Odd),
-		c.int(Tess_Element_Type.Connected_Polygons),
+		c.int(tess2.Winding_Rule.Odd),
+		c.int(tess2.Element_Type.Connected_Polygons),
 		3, // triangles
 		2, // 2D
 		raw_data(&normal),
@@ -87,10 +89,10 @@ bake :: proc(
 		return
 	}
 
-	vert_count := int(GetVertexCount(tess))
-	tri_count := int(GetElementCount(tess))
-	verts_ptr := GetVertices(tess)
-	elems_ptr := GetElements(tess)
+	vert_count := int(tess2.GetVertexCount(tess))
+	tri_count := int(tess2.GetElementCount(tess))
+	verts_ptr := tess2.GetVertices(tess)
+	elems_ptr := tess2.GetElements(tess)
 
 	if verts_ptr == nil || elems_ptr == nil || tri_count == 0 {
 		err = .Tessellation_Failed
@@ -117,7 +119,7 @@ bake :: proc(
 		}
 		for e in 0 ..< 3 {
 			nb := elems_ptr[base + 3 + e]
-			adjacency[i][e] = nb == TESS_UNDEF ? -1 : i32(nb)
+			adjacency[i][e] = nb == tess2.UNDEF ? -1 : i32(nb)
 		}
 	}
 
