@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "github.com/moomerman/libtess2": {
+      "ref": "main",
+      "sha": "3813970b2557a613d1726a2db24a19d561dc4ced",
+      "hash": "4a4b3a667d1dcf2e4c5d4f5dadb2a86bfa60bea19eb25793c32e84273eafb27b"
+    }
+  }
+}
