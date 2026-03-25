@@ -1,8 +1,6 @@
 # odin-navmesh
 
-2D navigation mesh library for Odin. Uses [libtess2](https://github.com/memononen/libtess2) for polygon tessellation and A* + funnel algorithm for pathfinding.
-
-Pre-built libraries are included for macOS (arm64/amd64), Linux (amd64), Windows (amd64), and WASM.
+2D navigation mesh library for Odin. Uses [libtess2](https://github.com/moomerman/libtess2) for polygon tessellation and A* + funnel algorithm for pathfinding.
 
 <img width="1310" height="778" alt="image" src="https://github.com/user-attachments/assets/8b807074-a9b0-4823-ba19-574045aecfef" />
 
@@ -116,15 +114,9 @@ Run the included example with:
 odin run examples/raylib/
 ```
 
-## Building the libraries
+## Dependencies
 
-The pre-built libtess2 binaries in `lib/` are committed to the repo so you can use the package immediately. To rebuild them (e.g. after an upstream libtess2 update), run the **Build libs** workflow from the GitHub Actions tab, or via the CLI:
-
-```
-gh workflow run build-libs.yml
-```
-
-This builds libtess2 for all platforms and commits the updated binaries to `lib/`.
+This library depends on [libtess2](https://github.com/moomerman/libtess2) which provides pre-built binaries and Odin bindings for the libtess2 tessellation library.
 
 ## Running tests
 
