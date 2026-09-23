@@ -52,7 +52,51 @@ bake :: proc(
 		err = .Too_Few_Vertices
 		return
 	}
+	contours := make([][]Vec2, 1 + len(holes), context.temp_allocator)
+	contours[0] = outer
+	copy(contours[1:], holes)
+	return _bake_contours(contours, .Odd, allocator)
+}
 
+// Bake a navigation mesh from a list of walkable polygons.
+//
+// The polygons are unioned: edge-adjacent and overlapping polygons become one
+// connected walkable area. Winding does not matter; each polygon is normalised.
+// Rooms in point-and-click games are often authored this way, as several
+// touching walkboxes.
+bake_polygons :: proc(
+	polygons: [][]Vec2,
+	allocator := context.allocator,
+) -> (
+	mesh: Nav_Mesh,
+	err: Bake_Error,
+) {
+	contours := make([dynamic][]Vec2, 0, len(polygons), context.temp_allocator)
+	for poly in polygons {
+		if len(poly) < 3 do continue
+		contour := poly
+		if signed_area(poly) < 0 {
+			contour = make([]Vec2, len(poly), context.temp_allocator)
+			for v, i in poly do contour[len(poly) - 1 - i] = v
+		}
+		append(&contours, contour)
+	}
+	if len(contours) == 0 {
+		err = .Too_Few_Vertices
+		return
+	}
+	return _bake_contours(contours[:], .Positive, allocator)
+}
+
+@(private)
+_bake_contours :: proc(
+	contours: [][]Vec2,
+	rule: tess2.Winding_Rule,
+	allocator := context.allocator,
+) -> (
+	mesh: Nav_Mesh,
+	err: Bake_Error,
+) {
 	tess := tess2.NewTess(nil)
 	if tess == nil {
 		err = .Tessellation_Failed
@@ -63,13 +107,9 @@ bake :: proc(
 	// Enable constrained Delaunay for better triangle quality.
 	tess2.SetOption(tess, c.int(tess2.Option.Constrained_Delaunay_Triangulation), 1)
 
-	// Add the outer boundary contour.
-	tess2.AddContour(tess, 2, raw_data(outer), size_of(Vec2), c.int(len(outer)))
-
-	// Add each hole as a separate contour.
-	for hole in holes {
-		if len(hole) >= 3 {
-			tess2.AddContour(tess, 2, raw_data(hole), size_of(Vec2), c.int(len(hole)))
+	for contour in contours {
+		if len(contour) >= 3 {
+			tess2.AddContour(tess, 2, raw_data(contour), size_of(Vec2), c.int(len(contour)))
 		}
 	}
 
@@ -77,7 +117,7 @@ bake :: proc(
 	normal := [3]f32{0, 0, 1}
 	result := tess2.Tesselate(
 		tess,
-		c.int(tess2.Winding_Rule.Odd),
+		c.int(rule),
 		c.int(tess2.Element_Type.Connected_Polygons),
 		3, // triangles
 		2, // 2D
@@ -139,6 +179,7 @@ destroy :: proc(mesh: ^Nav_Mesh) {
 }
 
 // Find a smoothed path from `start` to `goal` within the nav mesh.
+// Either endpoint outside the mesh is snapped to the nearest boundary point.
 find_path :: proc(mesh: ^Nav_Mesh, start, goal: Vec2, allocator := context.allocator) -> []Vec2 {
 	actual_goal := goal
 	goal_tri := _find_containing_triangle(mesh, goal)
@@ -150,25 +191,30 @@ find_path :: proc(mesh: ^Nav_Mesh, start, goal: Vec2, allocator := context.alloc
 		}
 	}
 
+	actual_start := start
 	start_tri := _find_containing_triangle(mesh, start)
 	if start_tri < 0 {
-		return nil
+		actual_start = _nearest_point_on_mesh(mesh, start)
+		start_tri = _find_containing_triangle(mesh, actual_start)
+		if start_tri < 0 {
+			return nil
+		}
 	}
 
 	if start_tri == goal_tri {
 		result := make([]Vec2, 2, allocator)
-		result[0] = start
+		result[0] = actual_start
 		result[1] = actual_goal
 		return result
 	}
 
-	tri_path := _astar(mesh, start_tri, goal_tri, start, actual_goal, allocator)
+	tri_path := _astar(mesh, start_tri, goal_tri, actual_start, actual_goal, allocator)
 	if tri_path == nil {
 		return nil
 	}
 	defer delete(tri_path)
 
-	return _funnel(mesh, tri_path, start, actual_goal, allocator)
+	return _funnel(mesh, tri_path, actual_start, actual_goal, allocator)
 }
 
 // Test if a point is inside the walkable area of the nav mesh.
@@ -183,6 +229,16 @@ nearest_point_on_mesh_boundary :: proc(mesh: ^Nav_Mesh, p: Vec2) -> Vec2 {
 
 
 // -- Geometry utilities -------------------------------------------------------
+
+// Twice the signed area of a polygon; positive when it winds the way libtess2
+// counts as +1 (counter-clockwise for y-up, clockwise on a y-down screen).
+signed_area :: proc(poly: []Vec2) -> f32 {
+	area: f32 = 0
+	for v, i in poly {
+		area += cross2d(v, poly[(i + 1) % len(poly)])
+	}
+	return area
+}
 
 cross2d :: proc(a, b: Vec2) -> f32 {
 	return a.x * b.y - a.y * b.x

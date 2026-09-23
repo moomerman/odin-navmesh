@@ -235,3 +235,113 @@ test_nearest_point_on_boundary :: proc(t: ^testing.T) {
 	nearest2 := nearest_point_on_mesh_boundary(&mesh, {-100, 300})
 	testing.expect(t, nearest2.x >= -1, "nearest should be on left boundary")
 }
+
+@(test)
+test_bake_polygons_overlap_unions :: proc(t: ^testing.T) {
+	// Two overlapping squares with opposite winding: Odd would cancel the overlap,
+	// the union must keep it walkable and connected.
+	a := []Vec2{{0, 0}, {200, 0}, {200, 200}, {0, 200}}
+	b := []Vec2{{100, 100}, {100, 300}, {300, 300}, {300, 100}}
+	mesh, err := bake_polygons({a, b})
+	defer destroy(&mesh)
+	testing.expect(t, err == .None, "bake_polygons should succeed")
+
+	testing.expect(t, point_in_mesh(&mesh, {150, 150}), "overlap should be walkable")
+	testing.expect(t, !point_in_mesh(&mesh, {250, 50}), "outside both should not be walkable")
+
+	path := find_path(&mesh, {20, 20}, {280, 280})
+	defer delete(path)
+	testing.expect(t, path != nil, "path across the overlap should exist")
+}
+
+@(test)
+test_bake_polygons_edge_adjacent_connect :: proc(t: ^testing.T) {
+	// Two squares sharing an edge, the second with a T-junction vertex.
+	a := []Vec2{{0, 0}, {100, 0}, {100, 100}, {0, 100}}
+	b := []Vec2{{100, 0}, {200, 0}, {200, 100}, {100, 100}, {100, 50}}
+	mesh, err := bake_polygons({a, b})
+	defer destroy(&mesh)
+	testing.expect(t, err == .None)
+
+	path := find_path(&mesh, {10, 50}, {190, 50})
+	defer delete(path)
+	testing.expect(t, path != nil, "adjacent boxes should be connected")
+	testing.expect(t, len(path) == 2, "straight line through the shared edge")
+}
+
+@(test)
+test_bake_polygons_too_few :: proc(t: ^testing.T) {
+	_, err := bake_polygons({{{0, 0}, {1, 1}}})
+	testing.expect(t, err == .Too_Few_Vertices)
+	_, err2 := bake_polygons(nil)
+	testing.expect(t, err2 == .Too_Few_Vertices)
+}
+
+// The Sheriff's office from Delores: seven touching walkboxes, the last one the
+// "jail_door" box. Hiding the door disconnects the jail.
+@(private = "file")
+sheriffs_office_boxes := [][]Vec2 {
+	{{88, 117}, {180, 122}, {267, 122}, {284, 115}, {349, 115}, {379, 121}, {475, 121}, {484, 121}, {520, 121}, {566, 139}, {46, 139}},
+	{{100, 112}, {125, 112}, {192, 113}, {180, 122}, {88, 117}},
+	{{132, 108}, {282, 106}, {282, 110}, {275, 113}, {192, 113}, {125, 112}},
+	{{275, 109}, {282, 110}, {284, 115}, {267, 122}},
+	{{398, 109}, {460, 109}, {466, 107}, {488, 107}, {501, 114}, {481, 114}, {473, 114}, {398, 114}},
+	{{352, 112}, {368, 112}, {379, 121}, {349, 115}},
+	{{473, 114}, {481, 114}, {484, 121}, {475, 121}},
+}
+
+@(private = "file")
+sheriffs_office :: proc(with_door: bool) -> [][]Vec2 {
+	boxes := sheriffs_office_boxes
+	return boxes if with_door else boxes[:len(boxes) - 1]
+}
+
+@(test)
+test_bake_polygons_sheriffs_office :: proc(t: ^testing.T) {
+	mesh, err := bake_polygons(sheriffs_office(true))
+	defer destroy(&mesh)
+	testing.expect(t, err == .None, "bake should succeed")
+
+	testing.expect(t, point_in_mesh(&mesh, {300, 130}), "main floor")
+	testing.expect(t, point_in_mesh(&mesh, {150, 110}), "back row")
+	testing.expect(t, point_in_mesh(&mesh, {430, 111}), "jail")
+	testing.expect(t, !point_in_mesh(&mesh, {430, 100}), "above the jail is a wall")
+
+	path := find_path(&mesh, {100, 130}, {430, 111})
+	defer delete(path)
+	testing.expect(t, path != nil, "floor to jail through the door")
+	for pt in path {
+		testing.expectf(t, pt.y >= 106 && pt.y <= 139, "path point %v left the room", pt)
+	}
+
+	back := find_path(&mesh, {100, 130}, {200, 110})
+	defer delete(back)
+	testing.expect(t, back != nil, "floor to back row")
+}
+
+@(test)
+test_bake_polygons_sheriffs_office_door_hidden :: proc(t: ^testing.T) {
+	mesh, err := bake_polygons(sheriffs_office(false))
+	defer destroy(&mesh)
+	testing.expect(t, err == .None)
+
+	testing.expect(t, point_in_mesh(&mesh, {430, 111}), "jail is still walkable")
+
+	// The goal is inside the jail so it doesn't snap; no path can reach it.
+	path := find_path(&mesh, {100, 130}, {430, 111})
+	defer delete(path)
+	testing.expect(t, path == nil, "jail unreachable without the door")
+}
+
+@(test)
+test_start_outside_mesh_snaps :: proc(t: ^testing.T) {
+	outer := []Vec2{{0, 0}, {800, 0}, {800, 600}, {0, 600}}
+	mesh, err := bake(outer)
+	defer destroy(&mesh)
+	testing.expect(t, err == .None)
+
+	path := find_path(&mesh, {-100, 300}, {400, 300})
+	defer delete(path)
+	testing.expect(t, path != nil, "off-mesh start should snap onto the mesh")
+	testing.expect(t, path[0].x >= -1, "start should be on the left boundary")
+}

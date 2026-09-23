@@ -30,6 +30,11 @@ bake(outer: []Vec2, holes: [][]Vec2) -> (Nav_Mesh, Bake_Error)
 Tessellate a walkable polygon with optional holes into a navigation mesh. `outer` must be counter-clockwise, holes must be clockwise.
 
 ```odin
+bake_polygons(polygons: [][]Vec2) -> (Nav_Mesh, Bake_Error)
+```
+Tessellate the union of several walkable polygons into one navigation mesh. Edge-adjacent and overlapping polygons connect; winding does not matter. Use this for rooms authored as a set of touching walkboxes.
+
+```odin
 destroy(mesh: ^Nav_Mesh)
 ```
 Free the mesh.
@@ -37,7 +42,7 @@ Free the mesh.
 ```odin
 find_path(mesh: ^Nav_Mesh, start, goal: Vec2) -> []Vec2
 ```
-Find a smoothed path between two points. If `goal` is outside the mesh it snaps to the nearest boundary point. Returns `nil` if no path exists. Caller must `delete` the result.
+Find a smoothed path between two points. An endpoint outside the mesh snaps to the nearest boundary point. Returns `nil` if no path exists. Caller must `delete` the result.
 
 ```odin
 point_in_mesh(mesh: ^Nav_Mesh, p: Vec2) -> bool
